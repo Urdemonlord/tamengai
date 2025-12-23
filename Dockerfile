@@ -1,4 +1,21 @@
-# TamengAI Docker Image
+# TamengAI Docker Image - Multi-stage build
+# Stage 1: Build
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy package files and install all dependencies (including dev)
+COPY package*.json ./
+RUN npm ci
+
+# Copy source files
+COPY tsconfig.json ./
+COPY src/ ./src/
+
+# Build TypeScript
+RUN npm run build
+
+# Stage 2: Production
 FROM node:20-alpine
 
 WORKDIR /app
@@ -9,17 +26,14 @@ COPY package*.json ./
 # Install production dependencies only
 RUN npm ci --only=production
 
-# Copy built files
-COPY dist/ ./dist/
+# Copy built files from builder stage
+COPY --from=builder /app/dist ./dist/
 
-# Environment variables
+# Non-sensitive environment variables only
+# Sensitive/configurable values should be passed at runtime via -e or .env
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOST=0.0.0.0
-ENV ENABLE_AUTH=true
-ENV ENABLE_RATE_LIMIT=true
-ENV RATE_LIMIT_MAX=100
-ENV RATE_LIMIT_WINDOW_MS=60000
 
 # Expose port
 EXPOSE 3000
