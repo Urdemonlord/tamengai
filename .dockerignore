@@ -1,11 +1,21 @@
+# Dependencies
 node_modules
-src
+
+# Test files (not needed in production)
 tests
+jest.config.js
+
+# Development/IDE files
 .kiro
-*.md
-*.log
 .git
 .gitignore
-jest.config.js
-tsconfig.json
+*.log
+
+# Documentation
+*.md
+
+# Examples (optional - remove if you want examples in image)
 examples
+
+# Build artifacts (will be created inside Docker)
+dist
