@@ -1,0 +1,11 @@
+node_modules
+src
+tests
+.kiro
+*.md
+*.log
+.git
+.gitignore
+jest.config.js
+tsconfig.json
+examples
