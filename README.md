@@ -88,6 +88,89 @@ Client → API Gateway → Pre-filter → LLM → Post-filter → Client
           Limit        Engine              Engine
 ```
 
+## Integration Examples
+
+TamengAI can be integrated as a security layer between your application and any LLM provider:
+
+### Quick Integration (TypeScript/JavaScript)
+```typescript
+import axios from 'axios';
+
+const TAMENGAI_URL = 'https://tamengai-production.up.railway.app';
+const TAMENGAI_TOKEN = 'your-token';
+
+async function secureChat(userPrompt: string) {
+  // 1. Pre-filter user input
+  const preFilter = await axios.post(
+    `${TAMENGAI_URL}/api/v1/filter/input`,
+    { prompt: userPrompt },
+    { headers: { Authorization: `Bearer ${TAMENGAI_TOKEN}` } }
+  );
+  
+  if (!preFilter.data.data.isAllowed) {
+    return 'Prompt blocked: ' + preFilter.data.data.reason;
+  }
+  
+  // 2. Call your LLM (OpenAI, Claude, etc.)
+  const llmResponse = await callYourLLM(userPrompt);
+  
+  // 3. Post-filter LLM output
+  const postFilter = await axios.post(
+    `${TAMENGAI_URL}/api/v1/filter/output`,
+    { originalPrompt: userPrompt, llmOutput: llmResponse },
+    { headers: { Authorization: `Bearer ${TAMENGAI_TOKEN}` } }
+  );
+  
+  if (!postFilter.data.data.isAllowed) {
+    return postFilter.data.data.safeResponse;
+  }
+  
+  return llmResponse;
+}
+```
+
+### Python Integration
+```python
+import requests
+
+class SecureLLMClient:
+    def __init__(self, tamengai_url, token):
+        self.url = tamengai_url
+        self.headers = {'Authorization': f'Bearer {token}'}
+    
+    def secure_completion(self, prompt, llm_func):
+        # Pre-filter
+        pre_result = requests.post(
+            f'{self.url}/api/v1/filter/input',
+            json={'prompt': prompt},
+            headers=self.headers
+        ).json()
+        
+        if not pre_result['data']['isAllowed']:
+            return f"Blocked: {pre_result['data']['reason']}"
+        
+        # Call LLM
+        llm_output = llm_func(prompt)
+        
+        # Post-filter
+        post_result = requests.post(
+            f'{self.url}/api/v1/filter/output',
+            json={'originalPrompt': prompt, 'llmOutput': llm_output},
+            headers=self.headers
+        ).json()
+        
+        if not post_result['data']['isAllowed']:
+            return post_result['data'].get('safeResponse', 'Blocked')
+        
+        return llm_output
+```
+
+See [examples/](examples/) for complete integration examples with:
+- OpenAI (`integration-openai.ts`)
+- Anthropic Claude (`integration-anthropic.ts`)
+- Python apps (`integration-python.py`)
+- Next.js (`integration-nextjs.tsx`)
+
 ## License
 
 MIT
