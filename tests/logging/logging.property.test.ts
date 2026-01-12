@@ -228,6 +228,133 @@ describe('Property 12: Blocked Request Logging', () => {
 });
 
 /**
+ * Blocked Request Logging - Extended Tests
+ */
+describe('BlockedRequestLog Storage', () => {
+  it('should auto-log blocked requests when pre-filter blocks', async () => {
+    const loggingService = createLoggingService() as LoggingService;
+
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 1, maxLength: 100 }),  // prompt
+        async (prompt) => {
+          const preFilterResult: PreFilterResponse = {
+            requestId: uuidv4(),
+            status: 'BLOCK',
+            safeResponse: 'Blocked',
+            matchedRules: [{
+              ruleId: 'test-rule',
+              ruleName: 'Test',
+              matchedText: 'test',
+              position: 0,
+              confidence: 1.0
+            }],
+            processingTimeMs: 10
+          };
+          
+          const entry = createTestLogEntry({ prompt, preFilterResult });
+          await loggingService.log(entry);
+          
+          // Should be auto-logged to blocked requests
+          const blockedRequests = await loggingService.queryBlockedRequests({});
+          const found = blockedRequests.find(b => b.requestId === entry.requestId);
+          
+          return found !== undefined && 
+                 found.blockingReason === 'PRE_FILTER' &&
+                 found.prompt === prompt;
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+
+  it('should auto-log blocked requests when post-filter filters', async () => {
+    const loggingService = createLoggingService() as LoggingService;
+
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 1, maxLength: 100 }),  // llmOutput
+        async (llmOutput) => {
+          const postFilterResult: PostFilterResponse = {
+            requestId: uuidv4(),
+            status: 'FILTER',
+            finalOutput: 'Filtered response',
+            matchedRules: [{
+              ruleId: 'post-rule',
+              ruleName: 'Post Test',
+              matchedText: 'harmful',
+              position: 0,
+              confidence: 1.0
+            }],
+            processingTimeMs: 15
+          };
+          
+          const entry = createTestLogEntry({ llmOutput, postFilterResult });
+          await loggingService.log(entry);
+          
+          // Should be auto-logged to blocked requests
+          const blockedRequests = await loggingService.queryBlockedRequests({ 
+            blockingReason: 'POST_FILTER' 
+          });
+          const found = blockedRequests.find(b => b.requestId === entry.requestId);
+          
+          return found !== undefined && 
+                 found.blockingReason === 'POST_FILTER' &&
+                 found.originalOutput === llmOutput;
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+
+  it('should provide accurate statistics', async () => {
+    const loggingService = createLoggingService() as LoggingService;
+    
+    // Add pre-filter blocked entries
+    for (let i = 0; i < 3; i++) {
+      const preFilterResult: PreFilterResponse = {
+        requestId: uuidv4(),
+        status: 'BLOCK',
+        safeResponse: 'Blocked',
+        matchedRules: [{
+          ruleId: 'rule-1',
+          ruleName: 'Rule 1',
+          matchedText: 'test',
+          position: 0,
+          confidence: 1.0
+        }],
+        processingTimeMs: 10
+      };
+      await loggingService.log(createTestLogEntry({ preFilterResult }));
+    }
+    
+    // Add post-filter blocked entries
+    for (let i = 0; i < 2; i++) {
+      const postFilterResult: PostFilterResponse = {
+        requestId: uuidv4(),
+        status: 'FILTER',
+        finalOutput: 'Filtered',
+        matchedRules: [{
+          ruleId: 'rule-2',
+          ruleName: 'Rule 2',
+          matchedText: 'harmful',
+          position: 0,
+          confidence: 1.0
+        }],
+        processingTimeMs: 15
+      };
+      await loggingService.log(createTestLogEntry({ postFilterResult }));
+    }
+    
+    const stats = await loggingService.getStats();
+    
+    expect(stats.blockedByPreFilter).toBe(3);
+    expect(stats.blockedByPostFilter).toBe(2);
+    expect(stats.topBlockedRules.length).toBeGreaterThan(0);
+  });
+});
+
+/**
  * Additional Logging tests
  */
 describe('LoggingService', () => {
