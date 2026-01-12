@@ -147,7 +147,12 @@ export function applyRule(rule: DetectionRule, text: string): RuleMatch[] {
 
   switch (rule.type) {
     case 'KEYWORD':
-      matches = matchKeyword(text, rule.pattern);
+      // If pattern contains pipe (|), treat as multiple keywords and use regex
+      if (rule.pattern.includes('|')) {
+        matches = matchPattern(text, rule.pattern);
+      } else {
+        matches = matchKeyword(text, rule.pattern);
+      }
       break;
     case 'PATTERN':
       matches = matchPattern(text, rule.pattern);
@@ -170,9 +175,14 @@ export function applyRule(rule: DetectionRule, text: string): RuleMatch[] {
     case 'HOAX':
     case 'MALWARE':
       // These use keyword or pattern matching
-      matches = rule.pattern.startsWith('^') || rule.pattern.includes('(')
-        ? matchPattern(text, rule.pattern)
-        : matchKeyword(text, rule.pattern);
+      // If contains pipe, use regex; otherwise check for regex patterns
+      if (rule.pattern.includes('|')) {
+        matches = matchPattern(text, rule.pattern);
+      } else if (rule.pattern.startsWith('^') || rule.pattern.includes('(')) {
+        matches = matchPattern(text, rule.pattern);
+      } else {
+        matches = matchKeyword(text, rule.pattern);
+      }
       break;
     default:
       matches = [];

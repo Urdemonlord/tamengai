@@ -19,9 +19,68 @@ import {
   FilterOutputRequest,
   RequestContext
 } from './index';
+import { DetectionRule } from './types/detection';
+import { 
+  INDONESIAN_BLACKLIST_KEYWORDS, 
+  INDONESIAN_JAILBREAK_PATTERNS,
+  INDONESIAN_SARA_TERMS 
+} from './detection/indonesian/keywords';
+
+// Create default detection rules from Indonesian keywords
+function createDefaultRules(): DetectionRule[] {
+  const rules: DetectionRule[] = [];
+  const now = new Date();
+
+  // Blacklist keywords rule
+  rules.push({
+    id: 'indonesian-blacklist',
+    name: 'Indonesian Blacklist Keywords',
+    pattern: INDONESIAN_BLACKLIST_KEYWORDS.join('|'),
+    type: 'KEYWORD',
+    action: 'BLOCK',
+    severity: 'HIGH',
+    language: 'ID',
+    enabled: true,
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  // Jailbreak patterns rule
+  rules.push({
+    id: 'indonesian-jailbreak',
+    name: 'Indonesian Jailbreak Patterns',
+    pattern: INDONESIAN_JAILBREAK_PATTERNS.join('|'),
+    type: 'JAILBREAK',
+    action: 'BLOCK',
+    severity: 'CRITICAL',
+    language: 'ID',
+    enabled: true,
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  // SARA terms rule
+  rules.push({
+    id: 'indonesian-sara',
+    name: 'Indonesian SARA Terms',
+    pattern: INDONESIAN_SARA_TERMS.join('|'),
+    type: 'SARA',
+    action: 'FLAG',
+    severity: 'MEDIUM',
+    language: 'ID',
+    enabled: true,
+    version: 1,
+    createdAt: now,
+    updatedAt: now
+  });
+
+  return rules;
+}
 
 // Initialize components
-const detectionEngine = createDetectionEngine();
+const detectionEngine = createDetectionEngine(createDefaultRules());
 const preFilter = createPreFilter(detectionEngine);
 const postFilter = createPostFilter(detectionEngine);
 const loggingService = createLoggingService();

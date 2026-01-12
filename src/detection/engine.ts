@@ -13,14 +13,32 @@ import {
 import { AnalysisContext, RuleMatch, ValidationResult, Language } from '../types/common';
 import { applyRules } from './matcher';
 import { validateRule, getMostRestrictiveAction } from './rule';
+import { findIndonesianFuzzyMatches, FuzzyMatchConfig } from './indonesian/fuzzy-matcher';
+
+/** Detection Engine configuration */
+export interface DetectionEngineConfig {
+  enableFuzzyMatching?: boolean;
+  fuzzyMatchConfig?: Partial<FuzzyMatchConfig>;
+}
+
+const DEFAULT_CONFIG: DetectionEngineConfig = {
+  enableFuzzyMatching: true,
+  fuzzyMatchConfig: {
+    threshold: 0.75,
+    minWordLength: 3,
+    maxWordLength: 50
+  }
+};
 
 /**
  * In-memory Detection Engine implementation
  */
 export class DetectionEngine implements IDetectionEngine {
   private rules: Map<string, DetectionRule> = new Map();
+  private config: DetectionEngineConfig;
 
-  constructor(initialRules?: DetectionRule[]) {
+  constructor(initialRules?: DetectionRule[], config?: DetectionEngineConfig) {
+    this.config = { ...DEFAULT_CONFIG, ...config };
     if (initialRules) {
       for (const rule of initialRules) {
         this.rules.set(rule.id, rule);
@@ -30,6 +48,7 @@ export class DetectionEngine implements IDetectionEngine {
 
   /**
    * Analyze input text (prompts) for harmful content
+   * Implements Property 18: Fuzzy Matching for Indonesian Slang
    */
   async analyzeInput(text: string, context: AnalysisContext): Promise<DetectionResult> {
     const startTime = Date.now();
@@ -38,7 +57,13 @@ export class DetectionEngine implements IDetectionEngine {
     const applicableRules = this.getApplicableRules(context.language);
     
     // Apply all rules
-    const matches = applyRules(applicableRules, text);
+    let matches = applyRules(applicableRules, text);
+    
+    // Apply fuzzy matching for Indonesian content (Property 18)
+    if (this.config.enableFuzzyMatching && (context.language === 'ID' || context.language === 'MIXED')) {
+      const fuzzyMatches = findIndonesianFuzzyMatches(text, this.config.fuzzyMatchConfig);
+      matches = [...matches, ...fuzzyMatches];
+    }
     
     // Determine recommended action based on matches
     const { recommendedAction, isHarmful } = this.determineAction(matches, applicableRules);
@@ -59,7 +84,7 @@ export class DetectionEngine implements IDetectionEngine {
    * Analyze output text (LLM responses) for harmful content
    */
   async analyzeOutput(text: string, context: AnalysisContext): Promise<DetectionResult> {
-    // Same logic as input analysis for now
+    // Same logic as input analysis
     return this.analyzeInput(text, context);
   }
 
